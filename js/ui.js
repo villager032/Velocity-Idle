@@ -24,7 +24,7 @@ export class UIManager {
         this.renderShop(); // Initial shop render
         this.renderInventory(); // Initial inventory render
         this.renderResources(); // Initial resources render
-        this.renderAreas();
+        this.initAreas();
     }
 
     update(dt) {
@@ -62,7 +62,7 @@ export class UIManager {
         }
 
         this.updateBackground(this.game.state.currentAreaId);
-        this.renderAreas(); // Update active highlight
+        this.updateAreas(); // Update active highlight
     }
 
     renderResources() {
@@ -224,32 +224,59 @@ export class UIManager {
         }
     }
 
-    renderAreas() {
+    initAreas() {
         this.elAreaList.innerHTML = '';
         MasterData.areas.forEach(area => {
             const div = document.createElement('div');
             div.className = 'area-item';
+            div.dataset.id = area.id;
+            div.onclick = () => {
+                // Only allow if unlocked
+                const isUnlocked = this.game.state.maxVelocity >= area.threshold;
+                if (isUnlocked || area.id === this.game.state.currentAreaId) {
+                    this.game.state.currentAreaId = area.id;
+                    this.updateAreas(); // Update highlight
+                }
+            };
+            this.elAreaList.appendChild(div);
+        });
+        this.updateAreas();
+    }
 
-            // Check Unlock
+    updateAreas() {
+        // Update status of existing elements
+        const children = Array.from(this.elAreaList.children);
+        children.forEach(div => {
+            const areaId = div.dataset.id;
+            const area = MasterData.areas.find(a => a.id === areaId);
+            if (!area) return;
+
             const isUnlocked = this.game.state.maxVelocity >= area.threshold;
 
-            if (area.id === this.game.state.currentAreaId) {
+            // Usage: clean classes then add
+            div.classList.remove('active', 'unlocked', 'locked');
+
+            if (areaId === this.game.state.currentAreaId) {
                 div.classList.add('active');
                 div.innerHTML = `<div class="name">[ACTIVE] ${area.name}</div>`;
             } else if (isUnlocked) {
                 div.classList.add('unlocked');
                 div.innerHTML = `<div class="name">${area.name}</div>`;
-                div.onclick = () => {
-                    this.game.state.currentAreaId = area.id;
-                    this.renderAreas(); // Update highlight
-                };
             } else {
                 div.classList.add('locked');
                 div.innerHTML = `<div class="name">???</div><div class="info">Req: ${area.threshold} km/h</div>`;
             }
-
-            this.elAreaList.appendChild(div);
         });
+    }
+
+    renderAreas() {
+        // Proxy to update for backward compatibility if called elsewhere, 
+        // but ideally we call initAreas() once and updateAreas() loop.
+        if (this.elAreaList.children.length === 0) {
+            this.initAreas();
+        } else {
+            this.updateAreas();
+        }
     }
 
     // --- Drag & Drop ---

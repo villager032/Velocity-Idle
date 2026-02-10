@@ -149,7 +149,12 @@ export class Game {
             const saveData = JSON.parse(saveString);
 
             // Merge state (to keep structure if we add new fields later)
-            this.state = { ...this.state, ...saveData.state };
+            this.state = {
+                ...this.state,
+                ...saveData.state,
+                // Ensure new fields exist if loading old save
+                maxVelocity: (saveData.state.maxVelocity !== undefined) ? saveData.state.maxVelocity : (saveData.state.velocity || 0)
+            };
 
             // Load Grid
             this.grid.importState(saveData.grid);
