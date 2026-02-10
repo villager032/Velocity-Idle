@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Velocity Idle</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- LEFT PANEL: Management -->
+        <aside id="left-panel" class="panel">
+            <div class="panel-header">
+                <h2>Management</h2>
+            </div>
+            
+            <section id="resources-section">
+                <h3>Resources</h3>
+                <ul id="resource-list">
+                    <!-- Populated by JS -->
+                </ul>
+            </section>
+
+            <section id="shop-section">
+                <h3>Shop</h3>
+                <div id="recipe-list" class="scrollable-list">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
+
+            <section id="inventory-section">
+                <h3>Inventory</h3>
+                <div id="inventory-grid" class="item-grid">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
+        </aside>
+
+        <!-- CENTER PANEL: Main View -->
+        <main id="center-panel">
+            <!-- Visualizer (Top) -->
+            <section id="visualizer">
+                <div id="scrolling-bg"></div>
+                <div id="vehicle-display">
+                    <div class="vehicle-body"></div>
+                    <div class="vehicle-wheel front"></div>
+                    <div class="vehicle-wheel rear"></div>
+                </div>
+                <div id="hud-overlay">
+                    <div class="stat-group">
+                        <span class="label">VELOCITY</span>
+                        <span id="velocity-display" class="value">0 km/h</span>
+                    </div>
+                    <div class="stat-group">
+                        <span class="label">DISTANCE</span>
+                        <span id="distance-display" class="value">0 m</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Vehicle Grid (Bottom) -->
+            <section id="grid-container">
+                <div class="panel-header">
+                    <h2>Chassis Assembly</h2>
+                </div>
+                <div id="vehicle-grid">
+                    <!-- Populated by JS (10x10) -->
+                </div>
+            </section>
+        </main>
+
+        <!-- RIGHT PANEL: Information -->
+        <aside id="right-panel" class="panel">
+            <div class="panel-header">
+                <h2>World Map</h2>
+            </div>
+            <div id="area-list" class="scrollable-list">
+                <!-- Populated by JS -->
+            </div>
+            
+            <div id="log-section">
+                <h3>Log</h3>
+                <div id="game-log" class="scrollable-list">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Modals / Overlays if needed -->
+    <div id="tooltip" class="tooltip hidden"></div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,316 @@
+:root {
+    /* Colors */
+    --bg-dark: #0f0f13;
+    --bg-panel: #1a1a20;
+    --bg-grid: #252530;
+    --accent-color: #00f0ff;
+    /* Cyber Cyan */
+    --accent-secondary: #ff0055;
+    /* Cyber Pink */
+    --text-main: #e0e0e0;
+    --text-muted: #888888;
+    --border-color: #333340;
+
+    /* Sizes */
+    --header-height: 60px;
+    --grid-cell-size: 50px;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    /* Prevent selection for better drag/drop feel */
+}
+
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+}
+
+h1,
+h2,
+h3,
+.label,
+.value {
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 1px;
+}
+
+/* --- Layout --- */
+#app {
+    display: grid;
+    grid-template-columns: 300px 1fr 250px;
+    grid-template-rows: 100vh;
+    gap: 1px;
+    background-color: var(--border-color);
+    /* Acts as border between panels */
+}
+
+.panel {
+    background-color: var(--bg-panel);
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    overflow-y: auto;
+}
+
+#center-panel {
+    background-color: var(--bg-dark);
+    display: grid;
+    grid-template-rows: 40% 60%;
+    overflow: hidden;
+}
+
+.panel-header {
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+    color: var(--accent-color);
+}
+
+/* --- Left Panel --- */
+#resources-section,
+#shop-section,
+#inventory-section {
+    margin-bottom: 2rem;
+}
+
+#resource-list li {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.2);
+    margin-bottom: 4px;
+    border-left: 3px solid var(--accent-secondary);
+}
+
+.scrollable-list {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+/* --- Inventory & Shop --- */
+.item-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+    gap: 5px;
+    padding: 5px;
+    background: rgba(0, 0, 0, 0.2);
+    min-height: 100px;
+}
+
+.part-item {
+    width: 50px;
+    height: 50px;
+    background-color: transparent;
+    border: 1px solid #555;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: grab;
+    font-size: 0.8rem;
+    position: relative;
+}
+
+.part-item:hover {
+    border-color: var(--accent-color);
+}
+
+.item-btn {
+    width: 100%;
+    padding: 10px;
+    background: #333;
+    border: 1px solid #555;
+    color: white;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.item-btn:hover {
+    background: #444;
+    border-color: var(--accent-color);
+}
+
+/* --- Visualizer --- */
+#visualizer {
+    position: relative;
+    background: #000;
+    overflow: hidden;
+    border-bottom: 2px solid var(--accent-color);
+}
+
+#scrolling-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 200%;
+    /* For looping */
+    height: 100%;
+    background: linear-gradient(90deg, #111 0%, #222 50%, #111 100%);
+    background-size: 50px 100%;
+    /* Grid pattern effect */
+    opacity: 0.5;
+    /* Animation set via JS */
+}
+
+#vehicle-display {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100px;
+    height: 60px;
+    z-index: 10;
+}
+
+.vehicle-body {
+    width: 100%;
+    height: 40px;
+    background: var(--accent-color);
+    border-radius: 5px 20px 5px 5px;
+    box-shadow: 0 0 10px var(--accent-color);
+}
+
+.vehicle-wheel {
+    position: absolute;
+    bottom: 0;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    animation: spin 0.5s linear infinite;
+}
+
+.vehicle-wheel.front {
+    right: 10px;
+}
+
+.vehicle-wheel.rear {
+    left: 10px;
+}
+
+#hud-overlay {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    text-align: right;
+    z-index: 20;
+    text-shadow: 0 0 5px black;
+}
+
+.stat-group {
+    margin-bottom: 10px;
+}
+
+.stat-group .value {
+    display: block;
+    font-size: 1.5rem;
+    color: var(--accent-color);
+}
+
+/* --- Grid Container --- */
+#grid-container {
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: radial-gradient(circle at center, #2a2a35 0%, #15151a 100%);
+}
+
+#vehicle-grid {
+    display: grid;
+    grid-template-columns: repeat(10, var(--grid-cell-size));
+    grid-template-rows: repeat(10, var(--grid-cell-size));
+    gap: 2px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 2px solid var(--accent-secondary);
+    padding: 5px;
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.1);
+}
+
+.grid-cell {
+    width: var(--grid-cell-size);
+    height: var(--grid-cell-size);
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: background 0.2s;
+}
+
+.grid-cell.drag-over {
+    background-color: rgba(0, 240, 255, 0.3);
+}
+
+/* --- Parts on Grid --- */
+.part {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    color: #000;
+}
+
+.part[data-type="engine"] {
+    /* SVG handles color */
+}
+
+.part[data-type="booster"] {
+    /* SVG handles color */
+}
+
+.part[data-type="frame"] {
+    /* SVG handles color */
+}
+
+.part[data-type="wheel"] {
+    /* SVG handles color */
+    border-radius: 0;
+    /* Let SVG handle shape */
+}
+
+.synergy-active {
+    box-shadow: 0 0 15px white !important;
+    z-index: 2;
+    animation: pulse 1s infinite alternate;
+}
+
+/* --- Right Panel --- */
+#area-list .area-item {
+    padding: 10px;
+    border-bottom: 1px solid #333;
+    cursor: pointer;
+    opacity: 0.5;
+}
+
+#area-list .area-item.active {
+    opacity: 1;
+    background: linear-gradient(90deg, rgba(0, 240, 255, 0.2) 0%, transparent 100%);
+    border-left: 4px solid var(--accent-color);
+}
+
+/* Animations */
+@keyframes spin {
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+
+    100% {
+        transform: scale(1.05);
+    }
+}
