@@ -138,8 +138,63 @@ export class UIManager {
                 <div class="cost">Cost: ${Object.entries(part.cost).map(([k, v]) => `${k}:${v}`).join(', ')}</div>
             `;
             btn.onclick = () => this.game.buyPart(part.id);
+
+            // Tooltip Events
+            btn.onmouseenter = (e) => this.showTooltip(e, part);
+            btn.onmousemove = (e) => this.moveTooltip(e);
+            btn.onmouseleave = () => this.hideTooltip();
+
             this.elShop.appendChild(btn);
         });
+    }
+
+    // --- Tooltip ---
+    showTooltip(e, part) {
+        const tooltip = document.getElementById('tooltip');
+        if (!tooltip) return;
+
+        let desc = `<div class="title">${part.name}</div>`;
+        desc += `<div class="stat">Type: ${part.type.toUpperCase()}</div>`;
+
+        if (part.baseVelocity > 0) {
+            desc += `<div class="stat">Base Velocity: +${part.baseVelocity}</div>`;
+        }
+
+        if (part.synergy && part.synergy.target) {
+            desc += `<div class="synergy">Synergy: x${part.synergy.mult} to adjacent ${part.synergy.target.toUpperCase()}</div>`;
+        }
+
+        // Specific logic for wheels/frames if added later to data
+        if (part.type === 'wheel') {
+            desc += `<div class="stat">Global Multiplier: +10%</div>`;
+        }
+        if (part.type === 'frame') {
+            desc += `<div class="stat">Adjacency Buff: x1.2 to Engines</div>`;
+        }
+        if (part.type === 'booster') {
+            desc += `<div class="stat">Adjacency Buff: x2.0 to Engines</div>`;
+        }
+
+        tooltip.innerHTML = desc;
+        tooltip.classList.remove('hidden');
+        this.moveTooltip(e);
+    }
+
+    moveTooltip(e) {
+        const tooltip = document.getElementById('tooltip');
+        if (!tooltip) return;
+
+        // Offset from mouse
+        const x = e.clientX + 15;
+        const y = e.clientY + 15;
+
+        tooltip.style.left = `${x}px`;
+        tooltip.style.top = `${y}px`;
+    }
+
+    hideTooltip() {
+        const tooltip = document.getElementById('tooltip');
+        if (tooltip) tooltip.classList.add('hidden');
     }
 
     renderInventory() {
@@ -252,19 +307,26 @@ export class UIManager {
             if (!area) return;
 
             const isUnlocked = this.game.state.maxVelocity >= area.threshold;
+            const isActive = areaId === this.game.state.currentAreaId;
 
-            // Usage: clean classes then add
-            div.classList.remove('active', 'unlocked', 'locked');
+            // Determine target state
+            let newState = 'locked';
+            if (isActive) newState = 'active';
+            else if (isUnlocked) newState = 'unlocked';
 
-            if (areaId === this.game.state.currentAreaId) {
-                div.classList.add('active');
-                div.innerHTML = `<div class="name">[ACTIVE] ${area.name}</div>`;
-            } else if (isUnlocked) {
-                div.classList.add('unlocked');
-                div.innerHTML = `<div class="name">${area.name}</div>`;
-            } else {
-                div.classList.add('locked');
-                div.innerHTML = `<div class="name">???</div><div class="info">Req: ${area.threshold} km/h</div>`;
+            // Only update if state changed
+            if (div.dataset.state !== newState) {
+                div.dataset.state = newState;
+                div.className = 'area-item'; // Reset classes
+                div.classList.add(newState);
+
+                if (newState === 'active') {
+                    div.innerHTML = `<div class="name">[ACTIVE] ${area.name}</div>`;
+                } else if (newState === 'unlocked') {
+                    div.innerHTML = `<div class="name">${area.name}</div>`;
+                } else {
+                    div.innerHTML = `<div class="name">???</div><div class="info">Req: ${area.threshold} km/h</div>`;
+                }
             }
         });
     }
