@@ -10,6 +10,7 @@ export class Game {
         // Game State
         this.state = {
             velocity: 0, // km/h (internal unit might be m/s)
+            maxVelocity: 0, // Track highest reached for unlocks
             distance: 0, // meters
             resources: { scrap: 0, rubber: 0, circuit: 0 }, // { materialId: amount }
             unlocks: [], // [recipeId]
@@ -81,20 +82,18 @@ export class Game {
             }
         }
 
-        // 4. Check Area Progression
-        // Update Area based on Max Velocity reached or current velocity? 
-        // Design doc says "Accumulated distance increases, and if current velocity > threshold..."
-        // Let's stick to Velocity Threshold for switching areas for now.
-        const nextArea = MasterData.areas.slice().reverse().find(a => this.state.velocity >= a.threshold);
-        if (nextArea && this.state.currentAreaId !== nextArea.id) {
-            this.state.currentAreaId = nextArea.id;
+        // 4. Check Area Progression / Unlocks
+        if (this.state.velocity > this.state.maxVelocity) {
+            this.state.maxVelocity = this.state.velocity;
         }
+
+        // Auto-switch removed. User chooses area.
 
         this.checkUnlocks();
     }
 
     checkUnlocks() {
-        const currentVel = this.state.velocity;
+        const currentVel = this.state.maxVelocity;
         // Optimization: Could check maxVelocity if we tracked it, but checking all parts against currentVel is fine for small list.
 
         Object.values(MasterData.parts).forEach(part => {

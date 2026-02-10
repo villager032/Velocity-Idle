@@ -208,6 +208,17 @@ export class UIManager {
                 cellDiv.ondragleave = () => cellDiv.classList.remove('drag-over');
                 cellDiv.ondrop = (e) => this.handleDrop(e, x, y);
 
+                // Right Click to Remove
+                cellDiv.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    if (this.game.grid.getPartAt(x, y)) {
+                        const partId = this.game.grid.getPartAt(x, y).partId;
+                        this.game.grid.removePart(x, y);
+                        this.addInventoryItem(partId);
+                        this.renderGrid(); // Re-render self
+                    }
+                };
+
                 this.elGrid.appendChild(cellDiv);
             }
         }
@@ -218,11 +229,25 @@ export class UIManager {
         MasterData.areas.forEach(area => {
             const div = document.createElement('div');
             div.className = 'area-item';
-            if (this.game.state.currentAreaId === area.id) div.classList.add('active');
-            div.innerHTML = `
-                <div class="name">${area.name}</div>
-                <div class="info">Threshold: ${area.threshold} km/h</div>
-            `;
+
+            // Check Unlock
+            const isUnlocked = this.game.state.maxVelocity >= area.threshold;
+
+            if (area.id === this.game.state.currentAreaId) {
+                div.classList.add('active');
+                div.innerHTML = `<div class="name">[ACTIVE] ${area.name}</div>`;
+            } else if (isUnlocked) {
+                div.classList.add('unlocked');
+                div.innerHTML = `<div class="name">${area.name}</div>`;
+                div.onclick = () => {
+                    this.game.state.currentAreaId = area.id;
+                    this.renderAreas(); // Update highlight
+                };
+            } else {
+                div.classList.add('locked');
+                div.innerHTML = `<div class="name">???</div><div class="info">Req: ${area.threshold} km/h</div>`;
+            }
+
             this.elAreaList.appendChild(div);
         });
     }

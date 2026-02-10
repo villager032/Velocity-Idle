@@ -288,14 +288,26 @@ h3,
 #area-list .area-item {
     padding: 10px;
     border-bottom: 1px solid #333;
-    cursor: pointer;
+    cursor: default;
     opacity: 0.5;
+    transition: all 0.2s;
+}
+
+#area-list .area-item.unlocked {
+    cursor: pointer;
+    opacity: 0.8;
+}
+
+#area-list .area-item.unlocked:hover {
+    background: rgba(255, 255, 255, 0.1);
+    opacity: 1;
 }
 
 #area-list .area-item.active {
     opacity: 1;
     background: linear-gradient(90deg, rgba(0, 240, 255, 0.2) 0%, transparent 100%);
     border-left: 4px solid var(--accent-color);
+    font-weight: bold;
 }
 
 /* Animations */
