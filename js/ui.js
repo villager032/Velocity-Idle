@@ -1,4 +1,5 @@
 import { MasterData } from './data.js';
+import { Translations } from './loc.js';
 
 export class UIManager {
     constructor(game) {
@@ -10,30 +11,315 @@ export class UIManager {
         this.elInventory = document.getElementById('inventory-grid');
         this.elGrid = document.getElementById('vehicle-grid');
         this.elVelocity = document.getElementById('velocity-display');
-        this.elDistance = document.getElementById('distance-display');
+
         this.elAreaList = document.getElementById('area-list');
         this.elBg = document.getElementById('scrolling-bg');
 
-        // Drag State
+        // Tabs
+        this.elTabShop = document.getElementById('btn-tab-shop');
+        this.elTabTech = document.getElementById('btn-tab-tech');
+        this.elContentShop = document.getElementById('tab-shop');
+        this.elContentTech = document.getElementById('tab-tech');
+        this.elTechList = document.getElementById('tech-list');
+
+        // Selection
+        this.elSelectionPanel = document.getElementById('selection-panel');
+        this.elSelName = document.getElementById('sel-name');
+        this.elSelLevel = document.getElementById('sel-level');
+        this.btnUpgrade = document.getElementById('btn-upgrade');
+        this.btnDeselect = document.getElementById('btn-deselect');
+
+        // State
         this.draggedItem = null; // { source: 'inventory'|'grid', id: string, x?: int, y?: int }
+        this.selectedCell = null; // { x, y }
+        this.lang = 'ja'; // Default
     }
 
     init() {
         this.renderGrid();
         this.setupDragAndDrop();
+        this.setupTabs();
+        this.setupSelection();
         this.renderShop(); // Initial shop render
         this.renderInventory(); // Initial inventory render
         this.renderResources(); // Initial resources render
+        this.renderTech(); // Initial tech render
         this.initAreas();
+        this.setupSettings();
+        this.updateTexts();
+    }
+
+    setupSettings() {
+        const modal = document.getElementById('settings-modal');
+        const btnOpen = document.getElementById('btn-settings-open');
+        const btnClose = document.getElementById('btn-settings-close');
+        const btnLang = document.getElementById('btn-lang-toggle');
+        const btnReset = document.getElementById('btn-reset');
+
+        if (btnOpen) {
+            btnOpen.onclick = () => {
+                if (modal.classList.contains('hidden')) {
+                    modal.classList.remove('hidden');
+                } else {
+                    modal.classList.add('hidden');
+                }
+            };
+        }
+        if (btnClose) btnClose.onclick = () => modal.classList.add('hidden');
+
+        if (btnLang) {
+            btnLang.onclick = () => {
+                const newLang = this.lang === 'en' ? 'ja' : 'en';
+                this.setLanguage(newLang);
+            };
+        }
+
+        if (btnReset) {
+            btnReset.onclick = () => {
+                const confirmMsg = this.getText('msg_reset_confirm');
+                if (window.confirm(confirmMsg)) {
+                    localStorage.removeItem('velocityIdleSave');
+                    alert(this.getText('msg_reset_done'));
+                    location.reload();
+                }
+            };
+        }
+    }
+
+    // Removed old setupLanguage as it is now part of setupSettings
+    // setupLanguage() { ... }
+
+    setLanguage(lang) {
+        this.lang = lang;
+        this.updateTexts();
+        this.renderShop();
+        this.renderTech();
+        this.renderResources();
+        this.renderSelection();
+        this.updateAreas(true); // Force update
+    }
+
+    getText(keyOrObj, args = {}) {
+        if (!keyOrObj) return '';
+
+        // Case 1: MasterData object { en: '...', ja: '...' }
+        if (typeof keyOrObj === 'object' && keyOrObj[this.lang]) {
+            return keyOrObj[this.lang];
+        }
+
+        // Case 2: Translation Key String
+        if (typeof keyOrObj === 'string') {
+            const dict = Translations[this.lang];
+            let val = dict[keyOrObj] || keyOrObj;
+
+            // Replace args {cost: 100} -> "Cost: 100"
+            for (const [k, v] of Object.entries(args)) {
+                val = val.replace(`{${k}}`, v);
+            }
+            return val;
+        }
+
+        return String(keyOrObj);
+    }
+
+    updateTexts() {
+        // Update data-i18n elements
+        const elements = document.querySelectorAll('[data-i18n]');
+        elements.forEach(el => {
+            const key = el.dataset.i18n;
+            el.textContent = this.getText(key);
+        });
+    }
+
+    setupSelection() {
+        this.btnDeselect.onclick = () => this.deselectCell();
+        this.btnUpgrade.onclick = () => this.upgradeSelectedPart();
+    }
+
+    selectCell(x, y) {
+        if (!this.game.grid.getPartAt(x, y)) {
+            this.deselectCell();
+            return;
+        }
+        this.selectedCell = { x, y };
+        this.renderSelection();
+        this.renderGrid(); // To show highlight
+    }
+
+    deselectCell() {
+        this.selectedCell = null;
+        this.elSelectionPanel.classList.add('hidden');
+        this.renderGrid(); // To remove highlight
+    }
+
+    renderSelection() {
+        if (!this.selectedCell) return;
+
+        const cell = this.game.grid.getPartAt(this.selectedCell.x, this.selectedCell.y);
+        if (!cell) {
+            this.deselectCell();
+            return;
+        }
+
+        const partDef = MasterData.parts[cell.partId];
+        const level = cell.level || 1;
+
+        // Calculate upgrade cost
+        // Formula: Base Cost * (1.5 ^ level)
+        // Simple linear for now? No, exponential is better for idle.
+        const costMultiplier = Math.pow(1.5, level);
+        const upgradeCost = {};
+        let canAfford = true;
+
+        for (const [res, amount] of Object.entries(partDef.cost)) {
+            upgradeCost[res] = Math.floor(amount * costMultiplier * 0.5); // 50% of scaled base cost
+            if ((this.game.state.resources[res] || 0) < upgradeCost[res]) {
+                canAfford = false;
+            }
+        }
+
+        this.elSelName.textContent = this.getText(partDef.name);
+        this.elSelLevel.textContent = `Lv.${level} -> Lv.${level + 1}`;
+
+        // Preview Stats
+        const currentStats = this.getPartStats(partDef, level);
+        const nextStats = this.getPartStats(partDef, level + 1);
+
+        let statHtml = '';
+        if (currentStats.baseVelocity) {
+            statHtml += `<div>${this.getText('lbl_base_vel')}: ${currentStats.baseVelocity.toFixed(1)} -> <span class="highlight">${nextStats.baseVelocity.toFixed(1)}</span></div>`;
+        }
+        if (currentStats.globalMult) {
+            statHtml += `<div>${this.getText('lbl_global_buff')}: +${(currentStats.globalMult * 100).toFixed(0)}% -> <span class="highlight">+${(nextStats.globalMult * 100).toFixed(0)}%</span></div>`;
+        }
+        if (currentStats.boosterMult) {
+            statHtml += `<div>${this.getText('lbl_adj_buff')}: x${currentStats.boosterMult.toFixed(2)} -> <span class="highlight">x${nextStats.boosterMult.toFixed(2)}</span></div>`;
+        }
+        if (currentStats.frameMult) {
+            statHtml += `<div>${this.getText('lbl_adj_buff')}: x${currentStats.frameMult.toFixed(2)} -> <span class="highlight">x${nextStats.frameMult.toFixed(2)}</span></div>`;
+        }
+
+        // Insert stat preview before upgrade button
+        let previewDiv = document.getElementById('upgrade-preview');
+        if (!previewDiv) {
+            previewDiv = document.createElement('div');
+            previewDiv.id = 'upgrade-preview';
+            previewDiv.className = 'upgrade-stats';
+            this.btnUpgrade.parentNode.insertBefore(previewDiv, this.btnUpgrade);
+        }
+        previewDiv.innerHTML = statHtml;
+
+
+        const costStr = Object.entries(upgradeCost).map(([k, v]) => `${this.getText(MasterData.materials.find(m => m.id === k).name)}:${v}`).join(', ');
+        const btnText = this.getText('msg_upgrade', { cost: costStr });
+        this.btnUpgrade.textContent = btnText;
+
+        this.elSelectionPanel.classList.remove('hidden');
+
+        // Initial state update
+        this.updateSelectionState();
+    }
+
+    upgradeSelectedPart() {
+        if (!this.selectedCell) return;
+        const cell = this.game.grid.getPartAt(this.selectedCell.x, this.selectedCell.y);
+        if (!cell) return;
+
+        const partDef = MasterData.parts[cell.partId];
+        const level = cell.level || 1;
+        const costMultiplier = Math.pow(1.5, level);
+        const upgradeCost = {};
+
+        // Check affordability again
+        for (const [res, amount] of Object.entries(partDef.cost)) {
+            upgradeCost[res] = Math.floor(amount * costMultiplier * 0.5);
+            if ((this.game.state.resources[res] || 0) < upgradeCost[res]) return;
+        }
+
+        // Pay
+        for (const [res, amount] of Object.entries(upgradeCost)) {
+            this.game.state.resources[res] -= amount;
+        }
+
+        // Upgrade
+        this.game.grid.upgradePart(this.selectedCell.x, this.selectedCell.y);
+
+        this.renderSelection(); // Update cost
+        this.renderGrid(); // Update badge
+        this.renderResources();
+    }
+
+    showEnding(accumulatedTime) {
+        // Create Modal
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.position = 'fixed';
+        modal.style.top = '50%';
+        modal.style.left = '50%';
+        modal.style.transform = 'translate(-50%, -50%)';
+        modal.style.width = '400px';
+        modal.style.zIndex = '3000';
+        modal.style.textAlign = 'center';
+        modal.style.display = 'block';
+
+        // Format Time
+        const totalSeconds = Math.floor(accumulatedTime);
+        const h = Math.floor(totalSeconds / 3600);
+        const m = Math.floor((totalSeconds % 3600) / 60);
+        const s = totalSeconds % 60;
+        const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h1 style="color: var(--accent-color); margin-bottom: 20px;">${this.getText('msg_game_clear')}</h1>
+                <p style="margin-bottom: 20px;">${this.getText('msg_clear_desc')}</p>
+                <h2 style="margin-bottom: 30px;">${this.getText('msg_clear_time', { time: timeStr })}</h2>
+                <button id="btn-ending-continue" class="item-btn" style="text-align: center;">${this.getText('btn_continue')}</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        document.getElementById('btn-ending-continue').onclick = () => {
+            modal.remove();
+        };
+    }
+
+    setupTabs() {
+        this.elTabShop.onclick = () => this.switchTab('shop');
+        this.elTabTech.onclick = () => this.switchTab('tech');
+    }
+
+    switchTab(tabName) {
+        if (tabName === 'shop') {
+            this.elTabShop.classList.add('active');
+            this.elTabTech.classList.remove('active');
+            this.elContentShop.classList.remove('hidden');
+            this.elContentTech.classList.add('hidden');
+        } else if (tabName === 'tech') {
+            this.elTabShop.classList.remove('active');
+            this.elTabTech.classList.add('active');
+            this.elContentShop.classList.add('hidden');
+            this.elContentTech.classList.remove('hidden');
+            this.renderTech(); // Refresh when opening
+        }
     }
 
     update(dt) {
         // Update Stats
         this.elVelocity.textContent = `${Math.floor(this.game.state.velocity)} km/h`;
-        this.elDistance.textContent = `${Math.floor(this.game.state.distance)} m`;
+
 
         // Update Resources
         this.renderResources();
+
+        // Update Tech List (Availability might change with resources)
+        // Optimization: Only update visible tab?
+        if (!this.elContentTech.classList.contains('hidden')) {
+            // Maybe don't re-render entire DOM every frame.
+            // Just update classes? For now, let's update heavily.
+            // Actually, let's NOT update every frame. Only on events.
+        }
 
         // Animation Speed (Visual only)
         // Base speed 5s, faster as velocity increases
@@ -60,9 +346,50 @@ export class UIManager {
                 this.elBg.style.transform = `translateX(-${px}%)`;
             }
         }
+        // Debounce? 60fps update of DOM text is fine for one element.
+        // this.updateHUD(); // Removed undefined function call
+
+        // Update Play Time (only needs seconds precision)
+        if (this.game.accumulatedTime) {
+            const totalSeconds = Math.floor(this.game.accumulatedTime);
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = totalSeconds % 60;
+            const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            const el = document.getElementById('play-time-display');
+            if (el) el.textContent = timeStr;
+        }
 
         this.updateBackground(this.game.state.currentAreaId);
         this.updateAreas(); // Update active highlight
+
+        // Update Upgrade Button State
+        if (this.selectedCell) {
+            this.updateSelectionState();
+        }
+    }
+
+    updateSelectionState() {
+        if (!this.selectedCell) return;
+        const cell = this.game.grid.getPartAt(this.selectedCell.x, this.selectedCell.y);
+        if (!cell) return;
+
+        const partDef = MasterData.parts[cell.partId];
+        const level = cell.level || 1;
+        const costMultiplier = Math.pow(1.5, level);
+        let canAfford = true;
+
+        for (const [res, amount] of Object.entries(partDef.cost)) {
+            const cost = Math.floor(amount * costMultiplier * 0.5);
+            if ((this.game.state.resources[res] || 0) < cost) {
+                canAfford = false;
+                break;
+            }
+        }
+
+        this.btnUpgrade.disabled = !canAfford;
+        this.btnUpgrade.style.opacity = canAfford ? '1' : '0.5';
+        this.btnUpgrade.style.cursor = canAfford ? 'pointer' : 'not-allowed';
     }
 
     renderResources() {
@@ -71,8 +398,28 @@ export class UIManager {
             const mat = MasterData.materials.find(m => m.id === id);
             if (!mat) continue;
 
+            // Visibility Check:
+            // 1. If we have some, show it.
+            // 2. If valid drop from any unlocked area, show it.
+            let isVisible = false;
+
+            if (value > 0) {
+                isVisible = true;
+            } else {
+                // Check unlocked areas
+                // Find area where primaryDrop === id
+                const sourceArea = MasterData.areas.find(a => a.primaryDrop === id);
+                if (sourceArea) {
+                    if (this.game.state.maxVelocity >= sourceArea.threshold) {
+                        isVisible = true;
+                    }
+                }
+            }
+
+            if (!isVisible) continue;
+
             const li = document.createElement('li');
-            li.innerHTML = `<span class="label">${mat.name}</span><span class="value">${Math.floor(value)}</span>`;
+            li.innerHTML = `<span class="label">${this.getText(mat.name)}</span><span class="value">${Math.floor(value)}</span>`;
             this.elResources.appendChild(li);
         }
     }
@@ -94,6 +441,9 @@ export class UIManager {
         if (partDef.id.includes('race')) color = '#ffcc00';
         if (partDef.id.includes('plasma')) color = '#00ffff';
         if (partDef.id.includes('light')) color = '#aaaaaa';
+        if (partDef.id.includes('alien')) color = '#00ffaa';
+        if (partDef.id.includes('nuclear')) color = '#33ff33'; // Radioactive green
+        if (partDef.id.includes('antimatter')) color = '#9900ff'; // Void purple
 
         let content = '';
 
@@ -125,6 +475,31 @@ export class UIManager {
         return `<svg viewBox="0 0 50 50" width="100%" height="100%">${content}</svg>`;
     }
 
+    getPartStats(partDef, level) {
+        const stats = {};
+        const levelMult = 1.0 + (level - 1) * 0.2; // Base + 20%
+        const synLevelMult = 1.0 + (level - 1) * 0.1; // Base + 10%
+
+        if (partDef.type === 'engine') {
+            stats.baseVelocity = partDef.baseVelocity * levelMult;
+        }
+        if (partDef.type === 'wheel') {
+            const val = partDef.effect ? partDef.effect.value : 0.1;
+            stats.globalMult = val * levelMult;
+        }
+        if (partDef.type === 'booster') {
+            // Base 2.0 (ignoring tech for display simplicity, or I could fetch it)
+            // Tech bonus complicates "base" display. Let's show the raw multiplier part.
+            const val = partDef.effect ? partDef.effect.value : 2.0;
+            stats.boosterMult = val * synLevelMult;
+        }
+        if (partDef.type === 'frame') {
+            const val = partDef.effect ? partDef.effect.value : 1.2;
+            stats.frameMult = val * synLevelMult;
+        }
+        return stats;
+    }
+
     renderShop() {
         this.elShop.innerHTML = '';
 
@@ -134,8 +509,8 @@ export class UIManager {
             const btn = document.createElement('div');
             btn.className = 'item-btn';
             btn.innerHTML = `
-                <div class="header">${part.name}</div>
-                <div class="cost">Cost: ${Object.entries(part.cost).map(([k, v]) => `${k}:${v}`).join(', ')}</div>
+                <div class="header">${this.getText(part.name)}</div>
+                <div class="cost">${this.getText('lbl_cost')}: ${Object.entries(part.cost).map(([k, v]) => `${this.getText(MasterData.materials.find(m => m.id === k).name)}:${v}`).join(', ')}</div>
             `;
             btn.onclick = () => this.game.buyPart(part.id);
 
@@ -148,31 +523,88 @@ export class UIManager {
         });
     }
 
+    renderTech() {
+        this.elTechList.innerHTML = '';
+
+        // Sort: Researched (bottom) -> Available (top) -> Locked (middle)
+        // Or standard dependency order?
+        // Let's just list them.
+        Object.values(MasterData.techs).forEach(tech => {
+            const isResearched = this.game.state.researched.includes(tech.id);
+            const canResearch = this.game.tech.canResearch(tech.id);
+
+            // Check visibility: Show if unlocked OR if prerequisites met (even if can't afford)
+            // Or simple check: Show if prerequisites are researched.
+            // If prerequisites not met, hide?
+            // Let's show everything for now to see tree, but dim locked ones.
+            // Better: Show if reqs are met.
+            let isVisible = true;
+            if (tech.req.length > 0) {
+                // If any req is NOT researched, hide it?
+                // No, show next step.
+                // If ALL reqs are researched, show.
+                // If ANY req is missing, hide (unless it's a root tech)
+                const reqsMet = tech.req.every(r => this.game.state.researched.includes(r));
+                if (!reqsMet) isVisible = false;
+            }
+
+            // Exceptions: Always show if we have researched it (though it should have met reqs)
+            if (isResearched) isVisible = true;
+
+            if (!isVisible) return;
+
+            const div = document.createElement('div');
+            div.className = `tech-item ${isResearched ? 'researched' : ''} ${!canResearch && !isResearched ? 'locked' : ''}`;
+
+            let costStr = Object.entries(tech.cost).map(([k, v]) => `${this.getText(MasterData.materials.find(m => m.id === k).name)}:${v}`).join(', ');
+
+            div.innerHTML = `
+                <h4>${this.getText(tech.name)} ${isResearched ? '✓' : ''}</h4>
+                <div class="desc">${this.getText(tech.desc)}</div>
+                ${!isResearched ? `<div class="cost">${this.getText('lbl_cost')}: ${costStr}</div>` : ''}
+            `;
+
+            if (!isResearched) {
+                div.onclick = () => {
+                    if (this.game.tech.doResearch(tech.id)) {
+                        this.renderTech();
+                        this.renderResources();
+                    }
+                };
+            }
+
+            this.elTechList.appendChild(div);
+        });
+    }
+
     // --- Tooltip ---
     showTooltip(e, part) {
         const tooltip = document.getElementById('tooltip');
         if (!tooltip) return;
 
-        let desc = `<div class="title">${part.name}</div>`;
-        desc += `<div class="stat">Type: ${part.type.toUpperCase()}</div>`;
+        let desc = `<div class="title">${this.getText(part.name)}</div>`;
+        desc += `<div class="stat">${this.getText('lbl_type')}: ${part.type.toUpperCase()}</div>`;
 
         if (part.baseVelocity > 0) {
-            desc += `<div class="stat">Base Velocity: +${part.baseVelocity}</div>`;
+            desc += `<div class="stat">${this.getText('lbl_base_vel')}: +${part.baseVelocity}</div>`;
         }
 
         if (part.synergy && part.synergy.target) {
-            desc += `<div class="synergy">Synergy: x${part.synergy.mult} to adjacent ${part.synergy.target.toUpperCase()}</div>`;
+            desc += `<div class="synergy">${this.getText('lbl_synergy')}: ${this.getText('val_to_adj')} ${part.synergy.target.toUpperCase()} x${part.synergy.mult}</div>`;
         }
 
         // Specific logic for wheels/frames if added later to data
         if (part.type === 'wheel') {
-            desc += `<div class="stat">Global Multiplier: +10%</div>`;
+            const val = part.effect ? part.effect.value : 0.1;
+            desc += `<div class="stat">${this.getText('lbl_global_buff')}: +${(val * 100).toFixed(0)}%</div>`;
         }
         if (part.type === 'frame') {
-            desc += `<div class="stat">Adjacency Buff: x1.2 to Engines</div>`;
+            const val = part.effect ? part.effect.value : 1.2;
+            desc += `<div class="stat">${this.getText('lbl_adj_buff')}: ${this.getText('val_to_eng')} x${val.toFixed(1)}</div>`;
         }
         if (part.type === 'booster') {
-            desc += `<div class="stat">Adjacency Buff: x2.0 to Engines</div>`;
+            const val = part.effect ? part.effect.value : 2.0;
+            desc += `<div class="stat">${this.getText('lbl_adj_buff')}: ${this.getText('val_to_eng')} x${val.toFixed(1)}</div>`;
         }
 
         tooltip.innerHTML = desc;
@@ -198,34 +630,93 @@ export class UIManager {
     }
 
     renderInventory() {
-        // Since we don't have a rigid inventory array in Game state yet (just infinite storage implicitly?), 
-        // let's assume `game.state.inventory` exists or we just maintain a simple list.
-        // Wait, `js/game.js` defined `unlocks` but not `inventory` array.
-        // Let's Add `inventory` to Game state dynamically or just fix Game.js later.
-        // For MVP, lets assume `game.state.inventory` is a list of Part IDs.
-
         if (!this.game.state.inventory) this.game.state.inventory = [];
 
         this.elInventory.innerHTML = '';
-        this.game.state.inventory.forEach((partId, index) => {
+        this.game.state.inventory.forEach((item, index) => {
+            // item can be string (ID) or object { id, level }
+            // Normalize
+            let partId = item;
+            let level = 1;
+
+            if (typeof item === 'object') {
+                partId = item.id;
+                level = item.level || 1;
+            }
+
             const div = document.createElement('div');
             div.className = 'part-item';
             div.innerHTML = this.getPartVisual(MasterData.parts[partId]);
+
+            // Render Level Badge
+            if (level > 1) {
+                const lvlBadge = document.createElement('div');
+                lvlBadge.className = 'level-badge';
+                lvlBadge.textContent = `Lv.${level}`;
+                div.appendChild(lvlBadge);
+            }
+
             div.draggable = true;
             div.dataset.role = 'inventory';
             div.dataset.index = index;
             div.dataset.partId = partId;
 
-            div.ondragstart = (e) => this.handleDragStart(e, { source: 'inventory', index, partId });
+            div.ondragstart = (e) => this.handleDragStart(e, { source: 'inventory', index, partId, level });
+
+            // Right Click to Delete (Overlay)
+            div.oncontextmenu = (e) => {
+                e.preventDefault();
+
+                // Remove existing overlays
+                const existing = this.elInventory.querySelectorAll('.delete-overlay');
+                existing.forEach(el => el.remove());
+
+                // Create Overlay
+                const overlay = document.createElement('div');
+                overlay.className = 'delete-overlay';
+                overlay.innerHTML = '🗑'; // Trash icon
+                overlay.title = this.getText('msg_delete_part_confirm', { level: level });
+
+                // Confirmed Delete
+                overlay.onclick = (ev) => {
+                    ev.stopPropagation();
+                    this.game.state.inventory.splice(index, 1);
+                    this.renderInventory();
+                };
+
+                // Cancel on leave
+                div.onmouseleave = () => overlay.remove();
+
+                // Cancel if clicked elsewhere (handled by re-render or explicit remove)
+                // Actually, div.appendChild might be enough.
+                div.appendChild(overlay);
+            };
 
             this.elInventory.appendChild(div);
         });
     }
 
     // Call this when inventory changes
-    addInventoryItem(partId) {
+    addInventoryItem(partIdOrData) {
         if (!this.game.state.inventory) this.game.state.inventory = [];
-        this.game.state.inventory.push(partId);
+
+        let newItem = { id: null, level: 1 };
+
+        if (typeof partIdOrData === 'string') {
+            newItem.id = partIdOrData;
+            newItem.level = 1;
+        } else if (typeof partIdOrData === 'object' && partIdOrData) {
+            newItem.id = partIdOrData.id || partIdOrData.partId;
+            newItem.level = partIdOrData.level || 1;
+        }
+
+        if (!newItem.id) {
+            console.error("UI.addInventoryItem: Invalid item data", partIdOrData);
+            return;
+        }
+
+        console.log("UI.addInventoryItem: Adding", newItem);
+        this.game.state.inventory.push(newItem);
         this.renderInventory();
     }
 
@@ -238,21 +729,55 @@ export class UIManager {
                 cellDiv.dataset.x = x;
                 cellDiv.dataset.y = y;
 
+                // Selection Highlight
+                if (this.selectedCell && this.selectedCell.x === x && this.selectedCell.y === y) {
+                    cellDiv.classList.add('selected');
+                    cellDiv.style.border = '2px solid var(--accent-color)';
+                }
+
                 const cellData = this.game.grid.getPartAt(x, y);
                 if (cellData) {
                     const partDef = MasterData.parts[cellData.partId];
                     const partDiv = document.createElement('div');
                     partDiv.className = 'part';
-                    partDiv.innerHTML = this.getPartVisual(partDef);
-                    partDiv.dataset.type = partDef.type;
+                    if (partDef) {
+                        partDiv.innerHTML = this.getPartVisual(partDef);
+                        partDiv.dataset.type = partDef.type;
+
+                        // Level Indicator
+                        if (cellData.level > 1) {
+                            const lvlBadge = document.createElement('div');
+                            lvlBadge.className = 'level-badge';
+                            lvlBadge.textContent = `Lv.${cellData.level}`;
+                            partDiv.appendChild(lvlBadge);
+                        }
+                    }
                     partDiv.draggable = true;
 
                     partDiv.ondragstart = (e) => {
                         e.stopPropagation(); // Don't drag cell
-                        this.handleDragStart(e, { source: 'grid', x, y, partId: cellData.partId });
+                        // Pass full data including level
+                        this.handleDragStart(e, {
+                            source: 'grid',
+                            x,
+                            y,
+                            partId: cellData.partId,
+                            level: cellData.level
+                        });
+                        // Also select on drag start? Maybe.
+                        // this.selectCell(x, y); // Disabled to prevent re-render killing drag
+                    };
+
+                    // Click to select
+                    partDiv.onclick = (e) => {
+                        e.stopPropagation();
+                        this.selectCell(x, y);
                     };
 
                     cellDiv.appendChild(partDiv);
+                } else {
+                    // Clicking empty cell deselects
+                    cellDiv.onclick = () => this.deselectCell();
                 }
 
                 // Drop Events
@@ -266,10 +791,11 @@ export class UIManager {
                 // Right Click to Remove
                 cellDiv.oncontextmenu = (e) => {
                     e.preventDefault();
-                    if (this.game.grid.getPartAt(x, y)) {
-                        const partId = this.game.grid.getPartAt(x, y).partId;
+                    const part = this.game.grid.getPartAt(x, y);
+                    if (part) {
                         this.game.grid.removePart(x, y);
-                        this.addInventoryItem(partId);
+                        this.addInventoryItem({ id: part.partId, level: part.level });
+                        this.deselectCell(); // Deselect on remove
                         this.renderGrid(); // Re-render self
                     }
                 };
@@ -298,7 +824,7 @@ export class UIManager {
         this.updateAreas();
     }
 
-    updateAreas() {
+    updateAreas(force = false) {
         // Update status of existing elements
         const children = Array.from(this.elAreaList.children);
         children.forEach(div => {
@@ -314,18 +840,18 @@ export class UIManager {
             if (isActive) newState = 'active';
             else if (isUnlocked) newState = 'unlocked';
 
-            // Only update if state changed
-            if (div.dataset.state !== newState) {
+            // Only update if state changed OR forced (e.g. language change)
+            if (force || div.dataset.state !== newState) {
                 div.dataset.state = newState;
                 div.className = 'area-item'; // Reset classes
                 div.classList.add(newState);
 
                 if (newState === 'active') {
-                    div.innerHTML = `<div class="name">[ACTIVE] ${area.name}</div>`;
+                    div.innerHTML = `<div class="name">${this.getText('active_area')} ${this.getText(area.name)}</div>`;
                 } else if (newState === 'unlocked') {
-                    div.innerHTML = `<div class="name">${area.name}</div>`;
+                    div.innerHTML = `<div class="name">${this.getText(area.name)}</div>`;
                 } else {
-                    div.innerHTML = `<div class="name">???</div><div class="info">Req: ${area.threshold} km/h</div>`;
+                    div.innerHTML = `<div class="name">${this.getText('area_locked')}</div><div class="info">${this.getText('area_req', { val: area.threshold })}</div>`;
                 }
             }
         });
@@ -358,9 +884,10 @@ export class UIManager {
 
             // If dragging from Grid to Inventory
             if (this.draggedItem.source === 'grid') {
-                const { x, y, partId } = this.draggedItem;
+                const { x, y, partId, level } = this.draggedItem;
+                console.log(`UI.ondrop (Inventory): Dropped from grid. Level: ${level}`);
                 this.game.grid.removePart(x, y);
-                this.addInventoryItem(partId);
+                this.addInventoryItem({ id: partId, level: level || 1 });
                 this.renderGrid();
                 this.draggedItem = null;
             }
@@ -392,47 +919,35 @@ export class UIManager {
 
         if (!this.draggedItem) return;
 
-        // Logic:
-        // 1. If dragging from Inventory:
-        //    - Place in Grid (if empty).
-        //    - If Grid has item, swap? Or fail.
-        //    - Remove from Inventory logic.
-
-        // 2. If dragging from Grid:
-        //    - Move to new slot.
-        //    - Update Grid data.
+        console.log("UI.handleDrop: DraggedItem:", this.draggedItem);
 
         const { source, index, partId, x: srcX, y: srcY } = this.draggedItem;
 
         if (source === 'inventory') {
-            // Check if slot empty
             if (this.game.grid.getPartAt(x, y)) {
-                // Swap or block? Block for MVP
                 console.log("Slot occupied");
                 return;
             }
-
-            // Place
-            this.game.grid.placePart(x, y, partId);
-            // Remove from inventory
+            const level = this.draggedItem.level || 1;
+            console.log(`UI.handleDrop: Inv -> Grid. Level: ${level}`);
+            this.game.grid.placePart(x, y, partId, level);
             this.game.state.inventory.splice(index, 1);
-
             this.renderInventory();
             this.renderGrid();
+
         } else if (source === 'grid') {
-            // Move within grid
+            const level = this.draggedItem.level || 1;
+            console.log(`UI.handleDrop: Grid -> Grid. Level: ${level}`);
             const existing = this.game.grid.getPartAt(x, y);
 
-            // Remove from source
             this.game.grid.removePart(srcX, srcY);
 
             if (existing) {
-                // Swap: Put existing to source
-                this.game.grid.placePart(srcX, srcY, existing.partId);
+                console.log(`UI.handleDrop: Swapping with existing level ${existing.level}`);
+                this.game.grid.placePart(srcX, srcY, existing.partId, existing.level);
             }
 
-            // Place dragged to target
-            this.game.grid.placePart(x, y, partId);
+            this.game.grid.placePart(x, y, partId, level);
 
             this.renderGrid();
         }

@@ -1,6 +1,7 @@
 import { Grid } from './grid.js';
 import { UIManager } from './ui.js';
 import { MasterData } from './data.js';
+import { TechManager } from './tech.js';
 
 export class Game {
     constructor() {
@@ -12,19 +13,24 @@ export class Game {
             velocity: 0, // km/h (internal unit might be m/s)
             maxVelocity: 0, // Track highest reached for unlocks
             distance: 0, // meters
-            resources: { scrap: 0, rubber: 0, circuit: 0 }, // { materialId: amount }
+            resources: { scrap: 0, rubber: 0, circuit: 0, plasma: 0, antimatter: 0 }, // { materialId: amount }
             unlocks: [], // [recipeId]
+            researched: [], // [techId]
             currentAreaId: 'area_junkyard',
-            inventory: ['engine_basic', 'wheel_basic', 'frame_basic'] // Start with some parts
+            inventory: ['engine_basic', 'wheel_basic', 'frame_basic'], // Start with some parts
+            cleared: false // Game Clear Flag
         };
 
         // Initialize Systems
         this.grid = new Grid(this);
         this.ui = new UIManager(this);
+        this.tech = new TechManager(this);
 
         // Initialize Resources
         MasterData.materials.forEach(mat => {
-            this.state.resources[mat.id] = 0;
+            if (this.state.resources[mat.id] === undefined) {
+                this.state.resources[mat.id] = 0;
+            }
         });
 
         // Initial Unlocks (Debug/Start)
@@ -55,6 +61,8 @@ export class Game {
         const deltaTime = (timestamp - this.lastTime) / 1000; // Seconds
         this.lastTime = timestamp;
 
+        this.accumulatedTime += deltaTime;
+
         this.update(deltaTime);
         this.ui.update(deltaTime);
 
@@ -76,7 +84,8 @@ export class Game {
             const area = MasterData.areas.find(a => a.id === this.state.currentAreaId);
             if (area) {
                 const dropRate = 0.5; // Base per second
-                const amount = dropRate * (1 + this.state.velocity * 0.01) * dt;
+                // Adjusted for ~10 hour gameplay (was 0.01)
+                const amount = dropRate * (1 + this.state.velocity * 0.002) * dt;
 
                 this.state.resources[area.primaryDrop] += amount;
             }
@@ -85,6 +94,13 @@ export class Game {
         // 4. Check Area Progression / Unlocks
         if (this.state.velocity > this.state.maxVelocity) {
             this.state.maxVelocity = this.state.velocity;
+        }
+
+        // 5. Check Game Clear (Score: 100,000 km/h)
+        if (this.state.maxVelocity >= 100000 && !this.state.cleared) {
+            this.state.cleared = true;
+            this.save();
+            this.ui.showEnding(this.accumulatedTime);
         }
 
         // Auto-switch removed. User chooses area.
@@ -136,6 +152,7 @@ export class Game {
         const saveData = {
             state: this.state,
             grid: this.grid.exportState(),
+            accumulatedTime: this.accumulatedTime,
             timestamp: Date.now()
         };
         localStorage.setItem('velocityIdleSave', JSON.stringify(saveData));
@@ -155,6 +172,18 @@ export class Game {
                 // Ensure new fields exist if loading old save
                 maxVelocity: (saveData.state.maxVelocity !== undefined) ? saveData.state.maxVelocity : (saveData.state.velocity || 0)
             };
+
+            this.accumulatedTime = saveData.accumulatedTime || 0;
+
+            // Ensure resources object has all current materials (deep merge fix)
+
+            // Ensure resources object has all current materials (deep merge fix)
+            if (!this.state.resources) this.state.resources = {};
+            MasterData.materials.forEach(mat => {
+                if (this.state.resources[mat.id] === undefined) {
+                    this.state.resources[mat.id] = 0;
+                }
+            });
 
             // Load Grid
             this.grid.importState(saveData.grid);

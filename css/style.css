@@ -57,7 +57,7 @@ h3,
     display: flex;
     flex-direction: column;
     padding: 1rem;
-    overflow-y: auto;
+    overflow-y: hidden;
 }
 
 #center-panel {
@@ -76,10 +76,50 @@ h3,
 }
 
 /* --- Left Panel --- */
-#resources-section,
+#resources-section {
+    margin-bottom: 1rem;
+}
+
+/* Tabs */
+#panel-tabs {
+    display: flex;
+    margin-bottom: 10px;
+    gap: 5px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.tab-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    padding: 0.5rem;
+    cursor: pointer;
+    font-family: 'Orbitron', sans-serif;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.tab-btn:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.tab-btn.active {
+    color: var(--accent-color);
+    border-bottom: 2px solid var(--accent-color);
+}
+
+.tab-content.hidden {
+    display: none;
+}
+
 #shop-section,
-#inventory-section {
-    margin-bottom: 2rem;
+#inventory-section,
+#tech-section {
+    margin-bottom: 0;
+    height: 100%;
+    /* Ensure they fill the parent */
 }
 
 #resource-list li {
@@ -92,11 +132,55 @@ h3,
 }
 
 .scrollable-list {
-    max-height: 200px;
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
     border: 1px solid var(--border-color);
     background: rgba(0, 0, 0, 0.2);
 }
+
+/* Tech Items */
+.tech-item {
+    padding: 0.8rem;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background 0.2s;
+    position: relative;
+}
+
+.tech-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.tech-item.researched {
+    background: rgba(0, 255, 0, 0.1);
+    color: #88ff88;
+    cursor: default;
+}
+
+.tech-item.locked {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(100%);
+}
+
+.tech-item h4 {
+    margin-bottom: 0.3rem;
+    font-size: 0.9rem;
+    color: var(--accent-color);
+}
+
+.tech-item .desc {
+    font-size: 0.8rem;
+    color: #ccc;
+    margin-bottom: 0.5rem;
+}
+
+.tech-item .cost {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
 
 /* --- Inventory & Shop --- */
 .item-grid {
@@ -119,10 +203,28 @@ h3,
     cursor: grab;
     font-size: 0.8rem;
     position: relative;
+    /* For level badge */
 }
 
 .part-item:hover {
     border-color: var(--accent-color);
+}
+
+.delete-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 0, 0, 0.8);
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.5rem;
+    cursor: pointer;
+    z-index: 10;
+    border-radius: inherit;
 }
 
 .item-btn {
@@ -262,19 +364,13 @@ h3,
     align-items: center;
     font-weight: bold;
     color: #000;
+    position: relative;
+    /* For level badge */
 }
 
-.part[data-type="engine"] {
-    /* SVG handles color */
-}
-
-.part[data-type="booster"] {
-    /* SVG handles color */
-}
-
-.part[data-type="frame"] {
-    /* SVG handles color */
-}
+/*.part[data-type="engine"] {}*/
+/*.part[data-type="booster"] {}*/
+/*.part[data-type="frame"] {}*/
 
 .part[data-type="wheel"] {
     /* SVG handles color */
@@ -370,4 +466,178 @@ h3,
     margin-top: 5px;
     font-size: 0.8rem;
     font-style: italic;
+}
+
+.level-badge {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    font-size: 0.6rem;
+    padding: 1px 3px;
+    border-radius: 3px;
+    pointer-events: none;
+    border: 1px solid var(--accent-color);
+}
+
+/* Settings Dropdown (formerly Modal) */
+.modal {
+    position: absolute;
+    top: 50px;
+    right: 10px;
+    width: 250px;
+    height: auto;
+    background: transparent;
+    display: block;
+    z-index: 2000;
+    pointer-events: none;
+    /* Let clicks pass through if hidden */
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: rgba(20, 20, 30, 0.95);
+    border: 1px solid var(--accent-color);
+    padding: 15px;
+    width: 100%;
+    color: #fff;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+    pointer-events: auto;
+    /* Re-enable clicks */
+    border-radius: 4px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #444;
+    padding-bottom: 5px;
+}
+
+.modal-header h2 {
+    font-size: 1.2rem;
+    margin: 0;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.2rem;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.close-btn:hover {
+    color: var(--accent-secondary);
+}
+
+.setting-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+}
+
+.setting-row button {
+    background: #333;
+    border: 1px solid #555;
+    color: #fff;
+    padding: 2px 8px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.setting-row button:hover {
+    border-color: var(--accent-color);
+}
+
+.setting-row button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.icon-btn {
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--accent-color);
+    color: #fff;
+    padding: 5px 8px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 1.2rem;
+    width: 35px;
+    height: 35px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.icon-btn:hover {
+    background: var(--accent-color);
+    color: #000;
+}
+
+/* Selection Panel */
+#grid-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+#selection-panel {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    right: 10px;
+    background: rgba(20, 20, 30, 0.95);
+    border: 1px solid var(--accent-color);
+    padding: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 100;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+}
+
+#selection-panel.hidden {
+    display: none;
+}
+
+#selection-panel .selection-info {
+    font-family: 'Orbitron', sans-serif;
+    color: var(--accent-color);
+}
+
+#btn-upgrade {
+    background: linear-gradient(180deg, #4a4, #262);
+    border: 1px solid #6f6;
+    color: #fff;
+    padding: 5px 15px;
+    cursor: pointer;
+    font-family: 'Orbitron', sans-serif;
+}
+
+#btn-upgrade:hover {
+    filter: brightness(1.2);
+}
+
+#btn-deselect {
+    background: transparent;
+    border: none;
+    color: #888;
+    font-size: 1.5rem;
+    cursor: pointer;
+    margin-left: 10px;
+}
+
+/* Utility */
+.hidden {
+    display: none !important;
 }

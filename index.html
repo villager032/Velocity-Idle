@@ -1,40 +1,102 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Velocity Idle</title>
     <link rel="stylesheet" href="css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@400;500&display=swap"
+        rel="stylesheet">
 </head>
+
 <body>
     <div id="app">
-        <!-- LEFT PANEL: Management -->
+        <!-- Settings Button (Top Right) -->
+        <button id="btn-settings-open" class="icon-btn"
+            style="position: absolute; top: 10px; right: 10px; z-index: 1000;">⚙️</button>
+
+        <!-- Settings Modal (Hidden by default) -->
+        <div id="settings-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 data-i18n="h_settings">Settings</h2>
+                    <button id="btn-settings-close" class="close-btn">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="setting-row">
+                        <span data-i18n="lbl_playtime">Play Time</span>
+                        <span id="play-time-display">00:00:00</span>
+                    </div>
+                    <div class="setting-row">
+                        <span data-i18n="lbl_language">Language</span>
+                        <button id="btn-lang-toggle">English / 日本語</button>
+                    </div>
+                    <div class="setting-row">
+                        <span data-i18n="lbl_save">Save</span>
+                        <button id="btn-save" disabled>Save (Auto)</button>
+                    </div>
+                    <div class="setting-row">
+                        <span data-i18n="lbl_sound">Sound</span>
+                        <button id="btn-sound" disabled>ON/OFF</button>
+                    </div>
+                    <div class="setting-row">
+                        <span data-i18n="lbl_reset" style="color: #ff4444;">Reset Data</span>
+                        <button id="btn-reset" class="danger-btn">DELETE</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LEFT PANEL: Shop & Tech & Inventory -->
         <aside id="left-panel" class="panel">
             <div class="panel-header">
-                <h2>Management</h2>
+                <h2 data-i18n="h_management">管理</h2>
             </div>
-            
-            <section id="resources-section">
-                <h3>Resources</h3>
-                <ul id="resource-list">
-                    <!-- Populated by JS -->
-                </ul>
-            </section>
 
-            <section id="shop-section">
-                <h3>Shop</h3>
-                <div id="recipe-list" class="scrollable-list">
+            <!-- TABS -->
+            <div id="panel-tabs">
+                <button id="btn-tab-shop" class="tab-btn active" data-i18n="tab_shop">ショップ</button>
+                <button id="btn-tab-tech" class="tab-btn" data-i18n="tab_tech">研究</button>
+            </div>
+
+            <!-- CONTENT AREA (Shop/Tech) -->
+            <div id="left-content-area"
+                style="flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0;">
+
+                <!-- TAB CONTENT: SHOP -->
+                <div id="tab-shop" class="tab-content"
+                    style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+                    <section id="shop-section" style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+                        <h3 data-i18n="h_shop">パーツショップ</h3>
+                        <div id="recipe-list" class="scrollable-list" style="flex: 1;">
+                            <!-- Populated by JS -->
+                        </div>
+                    </section>
+                </div>
+
+                <!-- TAB CONTENT: TECH -->
+                <div id="tab-tech" class="tab-content hidden"
+                    style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+                    <section id="tech-section" style="flex: 1; display: flex; flex-direction: column;">
+                        <h3 data-i18n="h_research">研究ツリー</h3>
+                        <div id="tech-list" class="scrollable-list" style="flex: 1;">
+                            <!-- Populated by JS -->
+                        </div>
+                    </section>
+                </div>
+
+            </div>
+
+            <!-- INVENTORY (Fixed/Persistent at Bottom) -->
+            <section id="inventory-section"
+                style="height: 40%; display: flex; flex-direction: column; min-height: 200px; margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 10px;">
+                <h3 data-i18n="h_inventory">インベントリ</h3>
+                <div id="inventory-grid" class="item-grid" style="flex: 1; overflow-y: auto;">
                     <!-- Populated by JS -->
                 </div>
             </section>
 
-            <section id="inventory-section">
-                <h3>Inventory</h3>
-                <div id="inventory-grid" class="item-grid">
-                    <!-- Populated by JS -->
-                </div>
-            </section>
         </aside>
 
         <!-- CENTER PANEL: Main View -->
@@ -49,20 +111,26 @@
                 </div>
                 <div id="hud-overlay">
                     <div class="stat-group">
-                        <span class="label">VELOCITY</span>
+                        <span class="label" data-i18n="lbl_velocity">速度</span>
                         <span id="velocity-display" class="value">0 km/h</span>
                     </div>
-                    <div class="stat-group">
-                        <span class="label">DISTANCE</span>
-                        <span id="distance-display" class="value">0 m</span>
-                    </div>
+
                 </div>
             </section>
 
             <!-- Vehicle Grid (Bottom) -->
             <section id="grid-container">
                 <div class="panel-header">
-                    <h2>Chassis Assembly</h2>
+                    <h2 data-i18n="h_chassis">車体アセンブリ</h2>
+                </div>
+                <!-- Selection Overlay -->
+                <div id="selection-panel" class="hidden">
+                    <div class="selection-info">
+                        <span id="sel-name">Engine</span>
+                        <span id="sel-level">Lv.1</span>
+                    </div>
+                    <button id="btn-upgrade">強化 (100 スクラップ)</button>
+                    <button id="btn-deselect">×</button>
                 </div>
                 <div id="vehicle-grid">
                     <!-- Populated by JS (10x10) -->
@@ -70,21 +138,23 @@
             </section>
         </main>
 
-        <!-- RIGHT PANEL: Information -->
+        <!-- RIGHT PANEL: Resources & Map -->
         <aside id="right-panel" class="panel">
-            <div class="panel-header">
-                <h2>World Map</h2>
-            </div>
-            <div id="area-list" class="scrollable-list">
-                <!-- Populated by JS -->
-            </div>
-            
-            <div id="log-section">
-                <h3>Log</h3>
-                <div id="game-log" class="scrollable-list">
+            <section id="resources-section">
+                <h2 data-i18n="h_resources" class="panel-header">リソース</h2>
+                <ul id="resource-list">
+                    <!-- Populated by JS -->
+                </ul>
+            </section>
+
+            <div style="flex: 1;"></div> <!-- Spacer -->
+
+            <section id="world-section">
+                <h2 data-i18n="h_world" class="panel-header">ワールドマップ</h2>
+                <div id="area-list" class="scrollable-list">
                     <!-- Populated by JS -->
                 </div>
-            </div>
+            </section>
         </aside>
     </div>
 
@@ -93,4 +163,5 @@
 
     <script type="module" src="js/main.js"></script>
 </body>
+
 </html>
